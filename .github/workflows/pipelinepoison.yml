@@ -1,0 +1,58 @@
+name: PipelinePoison Evaluation
+
+# Simulates the real deployment context this paper studies: an LLM assistant
+# embedded in a GitHub Actions workflow that reviews/triages/summarises PRs.
+# In production this would trigger on pull_request; for the evaluation
+# harness we also expose workflow_dispatch so a full corpus run can be
+# kicked off on demand without opening real PRs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Pipeline task to evaluate"
+        required: true
+        default: "review"
+        type: choice
+        options: [review, triage, summarise]
+      limit:
+        description: "Limit payload count (blank = all 60)"
+        required: false
+        default: "10"
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt --break-system-packages
+
+      - name: Run PipelinePoison evaluation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: "gemini-3.5-flash"
+          GEMINI_RATE_LIMIT_RPM: "10"
+          MAX_CALLS_PER_RUN: "500"
+          GEMINI_TRAINING_TIER: "true"
+        run: |
+          python run_experiment.py \
+            --provider gemini \
+            --task "${{ github.event.inputs.task || 'review' }}" \
+            --limit "${{ github.event.inputs.limit || '10' }}"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipelinepoison-results
+          path: |
+            results/*.jsonl
+            results/*.csv

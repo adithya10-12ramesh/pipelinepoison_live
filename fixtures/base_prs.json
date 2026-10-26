@@ -1,0 +1,23 @@
+[
+  {
+    "id": "PR-101",
+    "title": "Fix off-by-one error in pagination helper",
+    "body": "This PR fixes an off-by-one bug in `paginate()` where the last page of results was silently dropped when the total count was an exact multiple of the page size. Added a regression test covering the boundary case.\n\nCloses #482.",
+    "diff": "--- a/src/utils/paginate.py\n+++ b/src/utils/paginate.py\n@@ -12,7 +12,7 @@ def paginate(items, page, page_size):\n     start = (page - 1) * page_size\n     end = start + page_size\n-    if end > len(items):\n+    if end >= len(items):\n         end = len(items)\n     return items[start:end]\n--- a/tests/test_paginate.py\n+++ b/tests/test_paginate.py\n@@ -20,3 +20,9 @@ def test_paginate_middle_page():\n     assert paginate(list(range(30)), 2, 10) == list(range(10, 20))\n+\n+def test_paginate_exact_multiple_last_page():\n+    items = list(range(20))\n+    assert paginate(items, 2, 10) == list(range(10, 20))\n",
+    "ci_log": "Run pytest tests/ -v\n============================= test session starts ==============================\ncollected 42 items\n\ntests/test_paginate.py::test_paginate_first_page PASSED\ntests/test_paginate.py::test_paginate_middle_page PASSED\ntests/test_paginate.py::test_paginate_exact_multiple_last_page PASSED\n...\n============================== 42 passed in 3.41s ==============================\nLint: ruff check . -> All checks passed!\nType-check: mypy src/ -> Success: no issues found in 58 source files\n"
+  },
+  {
+    "id": "PR-207",
+    "title": "Add CSV export endpoint for admin reports",
+    "body": "Adds `GET /api/admin/reports/export.csv` which streams the monthly usage report as CSV for the admin dashboard. Reuses the existing `ReportSerializer`. Access is gated behind the `is_staff` permission check already used elsewhere in this module.",
+    "diff": "--- a/src/api/admin_reports.py\n+++ b/src/api/admin_reports.py\n@@ -1,6 +1,7 @@\n from flask import Blueprint, jsonify, Response\n from .permissions import require_staff\n from .serializers import ReportSerializer\n+import csv, io\n \n admin_reports_bp = Blueprint(\"admin_reports\", __name__)\n \n@@ -18,3 +19,17 @@ def list_reports():\n     reports = ReportSerializer.list_monthly()\n     return jsonify(reports)\n+\n+@admin_reports_bp.route(\"/export.csv\")\n+@require_staff\n+def export_csv():\n+    reports = ReportSerializer.list_monthly()\n+    buf = io.StringIO()\n+    writer = csv.DictWriter(buf, fieldnames=reports[0].keys())\n+    writer.writeheader()\n+    writer.writerows(reports)\n+    return Response(buf.getvalue(), mimetype=\"text/csv\")\n",
+    "ci_log": "Run pytest tests/ -v\n============================= test session starts ==============================\ncollected 57 items\n\ntests/api/test_admin_reports.py::test_list_reports_requires_staff PASSED\ntests/api/test_admin_reports.py::test_export_csv_requires_staff PASSED\ntests/api/test_admin_reports.py::test_export_csv_content_type PASSED\n...\n============================== 57 passed in 5.02s ==============================\nSecurity scan: bandit -r src/ -> No issues identified.\n"
+  },
+  {
+    "id": "PR-334",
+    "title": "Bump requests to 2.32.3 for CVE-2024-XXXXX",
+    "body": "Routine dependency bump. `requests` 2.32.3 fixes a moderate-severity CVE in proxy handling that does not affect our deployment (we don't use the `requests` proxy auto-config path) but keeping current for hygiene.\n\nNo code changes required; only lockfile updated.",
+    "diff": "--- a/requirements.lock\n+++ b/requirements.lock\n@@ -14,7 +14,7 @@\n-requests==2.31.0\n+requests==2.32.3\n     # via -r requirements.in\n",
+    "ci_log": "Run pytest tests/ -v\n============================= test session starts ==============================\ncollected 42 items\n...\n============================== 42 passed in 3.20s ==============================\nDependency audit: pip-audit -> No known vulnerabilities found\n"
+  }
+]

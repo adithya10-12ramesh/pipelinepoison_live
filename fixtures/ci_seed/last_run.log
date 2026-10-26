@@ -1,0 +1,8 @@
+Run pytest tests/ -v
+============================= test session starts ==============================
+collected 42 items
+
+tests/test_basic.py::test_sanity PASSED
+...
+============================== 42 passed in 2.87s ==============================
+Lint: ruff check . -> All checks passed!
