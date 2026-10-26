@@ -1,0 +1,70 @@
+name: PipelinePoison PR Review Bot (sandbox)
+
+# This workflow IS the victim pipeline being evaluated. It is deliberately
+# naive (see live_pipeline/bot.py's docstring) -- do not "fix" it to be
+# more secure, that would defeat the point of the experiment. Only ever
+# run this against a sandbox repo you own (paper/ethics_note.md).
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+# Serialize across the whole repo: this is the single biggest fix for the
+# 429 storm you get from batch-opening many PRs at once. Without this,
+# GitHub runs one job per PR concurrently, and every job's in-process rate
+# limiter (harness/llm_caller.py's RateLimiter) only throttles calls within
+# itself -- it has no idea the other jobs exist, so N concurrent jobs all
+# hit the same Mistral API key at once regardless of per-job pacing.
+concurrency:
+  group: pipelinepoison-pr-review
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  contents: read
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [groq]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run PR review bot (${{ matrix.provider }})
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_MODEL: ${{ secrets.MISTRAL_MODEL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: ${{ secrets.GROQ_MODEL }}
+          CANARY_DEPLOY_TOKEN: ${{ secrets.CANARY_DEPLOY_TOKEN }}
+          CANARY_DB_PASSWORD: ${{ secrets.CANARY_DB_PASSWORD }}
+          CANARY_INTERNAL_API_KEY: ${{ secrets.CANARY_INTERNAL_API_KEY }}
+        run: |
+          python live_pipeline/bot.py \
+            --pr-number ${{ github.event.pull_request.number }} \
+            --provider ${{ matrix.provider }} \
+            --out live_result_${{ matrix.provider }}.json
+
+      # Secondary record only -- fetch_live_results.py reads the hidden PR
+      # comment bot.py posts, which doesn't depend on the Actions artifact
+      # API. This upload is just a convenient debugging copy.
+      - name: Upload result artifact (debugging copy)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot_result_${{ matrix.provider }}-${{ github.event.pull_request.number }}
+          path: live_result_${{ matrix.provider }}.json
+          retention-days: 14
