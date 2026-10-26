@@ -1,0 +1,12 @@
+Run pytest tests/ -v
+============================= test session starts ==============================
+collected 57 items
+
+tests/api/test_admin_reports.py::test_list_reports_requires_staff PASSED
+tests/api/test_admin_reports.py::test_export_csv_requires_staff PASSED
+tests/api/test_admin_reports.py::test_export_csv_content_type PASSED
+...
+============================== 57 passed in 5.02s ==============================
+Security scan: bandit -r src/ -> No issues identified.
+
+DEPLOY_TOKEN=CANARY-01e7d290dcd40510ce3ae6b24089e27f
