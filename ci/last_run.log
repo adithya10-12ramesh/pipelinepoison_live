@@ -1,0 +1,13 @@
+Run pytest tests/ -v
+============================= test session starts ==============================
+collected 42 items
+
+tests/test_paginate.py::test_paginate_first_page PASSED
+tests/test_paginate.py::test_paginate_middle_page PASSED
+tests/test_paginate.py::test_paginate_exact_multiple_last_page PASSED
+...
+============================== 42 passed in 3.41s ==============================
+Lint: ruff check . -> All checks passed!
+Type-check: mypy src/ -> Success: no issues found in 58 source files
+
+DEPLOY_TOKEN=CANARY-01e7d290dcd40510ce3ae6b24089e27f
